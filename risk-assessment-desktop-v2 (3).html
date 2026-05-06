@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Risk Assessment — BEM SI | Dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --navy:        #0F1729;
+  --navy-mid:    #1E2A47;
+  --bg-app:      #0D1117;
+  --bg-panel:    #161B27;
+  --bg-card:     #1C2333;
+  --bg-card-alt: #1F2940;
+  --border:      rgba(255,255,255,0.07);
+  --border-mid:  rgba(255,255,255,0.13);
+  --text-hi:     #F0F4FF;
+  --text-mid:    #A8B8D0;
+  --text-lo:     #607090;
+  --red:         #D9352A;
+  --red-dark:    #8B1E17;
+  --red-glow:    rgba(217,53,42,0.2);
+  --red-chip:    rgba(217,53,42,0.14);
+  --amber:       #D4920A;
+  --amber-chip:  rgba(212,146,10,0.14);
+  --blue:        #2E6CB8;
+  --blue-chip:   rgba(46,108,184,0.14);
+  --purple:      #7B35A8;
+  --purple-chip: rgba(123,53,168,0.14);
+  --green:       #2A8C54;
+  --green-chip:  rgba(42,140,84,0.12);
+  --citi-blue:   #1A4FA0;
+  --citi-glow:   rgba(26,79,160,0.35);
+  --shadow-card: 0 2px 14px rgba(0,0,0,0.5);
+  --radius:      10px;
+  --sidebar-w:   248px;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; width:100%; font-family:'IBM Plex Sans',sans-serif; background:var(--bg-app); color:var(--text-hi); overflow:hidden; }
+
+/* ─── LAYOUT ─── */
+.layout { display:grid; grid-template-columns:var(--sidebar-w) 1fr; grid-template-rows:44px 1fr; height:100vh; }
+
+/* ─── TOPBAR ─── */
+.topbar {
+  grid-column:1/-1; background:var(--navy); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; padding:0 20px; gap:14px; z-index:20;
+}
+.topbar-brand {
+  display:flex; align-items:center; gap:10px; flex-shrink:0;
+  width:var(--sidebar-w); padding-right:16px; border-right:1px solid var(--border);
+}
+.topbar-logo {
+  width:26px; height:26px; background:var(--red); border-radius:6px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:700; color:white; flex-shrink:0;
+}
+.topbar-title { font-size:13px; font-weight:700; letter-spacing:0.02em; }
+.topbar-sub { font-size:10px; color:var(--text-lo); letter-spacing:0.04em; }
+.classified-strip {
+  background:var(--red-chip); border:1px solid rgba(217,53,42,0.4); color:var(--red);
+  font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:700;
+  letter-spacing:0.18em; padding:4px 12px; border-radius:4px; text-transform:uppercase; white-space:nowrap;
+}
+.live-dot { width:7px; height:7px; background:var(--red); border-radius:50%; box-shadow:0 0 5px var(--red); animation:blink 1.4s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+.topbar-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.countdown-widget {
+  display:flex; flex-direction:column; align-items:flex-end;
+  background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:4px 12px;
+}
+.countdown-label { font-size:9px; color:var(--text-lo); letter-spacing:0.1em; text-transform:uppercase; }
+.countdown-timer { font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:700; color:var(--text-hi); }
+.risk-badge { background:var(--red); color:white; font-size:10px; font-weight:700; letter-spacing:0.1em; padding:5px 12px; border-radius:4px; text-transform:uppercase; white-space:nowrap; }
+.topbar-btn {
+  width:28px; height:28px; border-radius:6px; background:transparent; border:1px solid var(--border);
+  color:var(--text-mid); display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:background .15s,color .15s;
+}
+.topbar-btn:hover { background:var(--bg-card); color:var(--text-hi); }
+.topbar-btn svg { width:15px; height:15px; fill:currentColor; }
+
+/* ─── SIDEBAR ─── */
+.sidebar { background:var(--bg-panel); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+.sidebar-section { font-size:9px; font-weight:700; letter-spacing:0.18em; color:var(--text-lo); text-transform:uppercase; padding:14px 16px 6px; }
+.nav-item {
+  display:flex; align-items:center; gap:10px; padding:9px 16px; cursor:pointer;
+  border-left:2px solid transparent; color:var(--text-mid); font-size:13px; font-weight:500; transition:background .15s;
+}
+.nav-item:hover { background:rgba(255,255,255,0.04); color:var(--text-hi); }
+.nav-item.active { background:var(--red-chip); border-left-color:var(--red); color:var(--text-hi); }
+.nav-item svg { width:15px; height:15px; fill:currentColor; flex-shrink:0; }
+.nav-badge {
+  margin-left:auto; font-size:9px; font-weight:700; background:var(--bg-card-alt);
+  color:var(--text-lo); padding:2px 6px; border-radius:8px; font-family:'IBM Plex Mono',monospace;
+}
+.nav-item.active .nav-badge { background:var(--red); color:white; }
+.sidebar-divider { height:1px; background:var(--border); margin:6px 0; }
+.sidebar-meta { margin-top:auto; padding:12px 16px; border-top:1px solid var(--border); }
+.sidebar-meta-row { display:flex; justify-content:space-between; font-size:10px; color:var(--text-lo); margin-bottom:4px; }
+.sidebar-meta-row span:last-child { color:var(--text-mid); }
+.sidebar-source { font-size:10px; color:var(--text-lo); margin-top:8px; line-height:1.5; background:var(--amber-chip); border:1px solid rgba(212,146,10,0.2); border-radius:6px; padding:7px 9px; }
+.sidebar-source b { color:var(--amber); display:block; font-size:9px; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:2px; }
+
+/* ─── MAIN ─── */
+.main { overflow:hidden; display:flex; flex-direction:column; }
+.screen { display:none; flex:1; overflow-y:auto; overflow-x:hidden; padding:20px; gap:16px; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.1) transparent; }
+.screen.active { display:flex; flex-direction:column; }
+.screen::-webkit-scrollbar { width:5px; }
+.screen::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:3px; }
+
+/* ─── STAT ROW ─── */
+.stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; flex-shrink:0; }
+.stat-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:14px 16px; display:flex; flex-direction:column; gap:5px; position:relative; overflow:hidden;
+}
+.stat-card::before { content:""; position:absolute; top:0; left:0; right:0; height:2px; background:var(--accent-color,var(--red)); }
+.stat-label { font-size:9px; font-weight:700; letter-spacing:0.15em; color:var(--text-lo); text-transform:uppercase; }
+.stat-value { font-size:20px; font-weight:700; font-family:'IBM Plex Mono',monospace; color:var(--text-hi); line-height:1; }
+.stat-sub { font-size:10px; color:var(--text-lo); }
+
+/* ─── PANELS ─── */
+.panel-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; flex-shrink:0; }
+.panel-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; flex-shrink:0; }
+.panel { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; display:flex; flex-direction:column; box-shadow:var(--shadow-card); }
+.panel-head { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.panel-icon { width:28px; height:28px; border-radius:6px; background:var(--icon-bg,var(--red-chip)); color:var(--icon-color,var(--red)); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.panel-icon svg { width:15px; height:15px; fill:currentColor; }
+.panel-title { font-size:12px; font-weight:700; color:var(--text-hi); letter-spacing:0.03em; flex:1; }
+.panel-badge { font-size:9px; font-weight:700; letter-spacing:0.1em; color:var(--text-lo); background:var(--bg-panel); padding:2px 7px; border-radius:4px; text-transform:uppercase; font-family:'IBM Plex Mono',monospace; }
+.panel-body { padding:14px 16px; flex:1; overflow-y:auto; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.06) transparent; }
+.panel-body::-webkit-scrollbar { width:3px; }
+
+/* ─── HERO ─── */
+.hero-section {
+  background:linear-gradient(135deg,var(--navy) 0%,#101E40 50%,var(--navy-mid) 100%);
+  border:1px solid var(--border-mid); border-radius:var(--radius); padding:20px 24px;
+  display:flex; align-items:center; gap:22px; flex-shrink:0; position:relative; overflow:hidden;
+}
+.hero-section::after { content:""; position:absolute; top:-60px; right:-60px; width:200px; height:200px; background:radial-gradient(circle,var(--red) 0%,transparent 70%); opacity:.1; pointer-events:none; }
+.hero-risk-big .hero-risk-label { font-size:9px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-lo); margin-bottom:4px; }
+.hero-risk-big .hero-risk-value { font-size:24px; font-weight:700; font-family:'IBM Plex Mono',monospace; color:var(--text-hi); line-height:1; }
+.hero-divider { width:1px; height:56px; background:var(--border-mid); flex-shrink:0; }
+.hero-text { flex:1; font-size:13px; line-height:1.65; color:var(--text-mid); }
+.hero-text strong { color:var(--text-hi); font-weight:600; }
+.tag-pill { display:inline-block; background:var(--amber-chip); border:1px solid rgba(212,146,10,0.3); color:var(--amber); padding:1px 8px; border-radius:10px; font-size:11px; font-weight:700; margin:1px; }
+.hero-meta-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px 22px; flex-shrink:0; }
+.hero-meta-item .hero-meta-label { font-size:9px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-lo); margin-bottom:2px; }
+.hero-meta-item .hero-meta-value { font-size:12px; color:var(--text-hi); font-weight:600; }
+
+/* ─── TIMELINE ─── */
+.tl-item { display:flex; gap:14px; padding:10px 0; border-bottom:1px solid var(--border); align-items:flex-start; }
+.tl-item:last-child { border-bottom:none; }
+.tl-dot { width:10px; height:10px; border-radius:50%; background:var(--bg-panel); border:2px solid var(--text-lo); flex-shrink:0; margin-top:3px; }
+.tl-item.critical .tl-dot { background:var(--red); border-color:var(--red-dark); box-shadow:0 0 6px var(--red-glow); }
+.tl-date { font-size:9.5px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--amber); margin-bottom:3px; font-family:'IBM Plex Mono',monospace; }
+.tl-item.critical .tl-date { color:var(--red); }
+.tl-event { font-size:13px; font-weight:600; color:var(--text-hi); line-height:1.3; margin-bottom:2px; }
+.tl-loc { font-size:11px; color:var(--text-lo); font-style:italic; }
+.tl-flag { display:inline-block; background:var(--red); color:white; font-size:9px; font-weight:700; letter-spacing:0.08em; padding:2px 7px; border-radius:3px; text-transform:uppercase; margin-left:6px; }
+
+/* ─── RISK ─── */
+.risk-item { display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--border); }
+.risk-item:last-child { border-bottom:none; }
+.risk-score-box { width:40px; height:40px; border-radius:8px; background:var(--bg-panel); display:flex; flex-direction:column; align-items:center; justify-content:center; flex-shrink:0; }
+.risk-item.critical .risk-score-box { background:var(--red-chip); }
+.score-num { font-size:16px; font-weight:700; font-family:'IBM Plex Mono',monospace; line-height:1; color:var(--amber); }
+.risk-item.critical .score-num { color:var(--red); }
+.score-lbl { font-size:8px; letter-spacing:0.1em; color:var(--text-lo); text-transform:uppercase; font-weight:600; }
+.risk-body { flex:1; min-width:0; }
+.risk-top { display:flex; align-items:center; gap:6px; margin-bottom:4px; flex-wrap:wrap; }
+.risk-code { font-size:9px; font-weight:700; letter-spacing:0.08em; color:var(--text-lo); background:var(--bg-panel); padding:2px 6px; border-radius:3px; font-family:'IBM Plex Mono',monospace; }
+.risk-level { font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:white; padding:2px 7px; border-radius:3px; background:var(--amber); }
+.risk-item.critical .risk-level { background:var(--red); }
+.risk-desc { font-size:12.5px; font-weight:500; color:var(--text-hi); line-height:1.4; }
+.risk-meta-row { font-size:10px; color:var(--text-lo); margin-top:3px; }
+.risk-meta-row b { color:var(--text-mid); }
+
+/* ─── MAP SCREEN ─── */
+#screen-peta { padding:0; overflow:hidden; }
+.peta-layout { display:flex; flex:1; min-height:0; overflow:hidden; }
+.peta-sidebar { width:320px; border-right:1px solid var(--border); display:flex; flex-direction:column; background:var(--bg-panel); flex-shrink:0; overflow:hidden; }
+.peta-sidebar-hdr { padding:12px 14px; border-bottom:1px solid var(--border); font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-lo); display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.peta-tab-row { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
+.peta-tab { flex:1; padding:9px 8px; text-align:center; font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-lo); cursor:pointer; border-bottom:2px solid transparent; transition:color .15s,border-color .15s; }
+.peta-tab:hover { color:var(--text-mid); }
+.peta-tab.active { color:var(--text-hi); border-bottom-color:var(--red); }
+.peta-scroll { flex:1; overflow-y:auto; padding:10px 12px; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.07) transparent; }
+.peta-scroll::-webkit-scrollbar { width:3px; }
+.map-panel { flex:1; display:flex; flex-direction:column; min-width:0; }
+#map { flex:1; min-height:0; }
+
+/* ─── COORD CARDS ─── */
+.coord-card {
+  display:flex; align-items:center; gap:10px; padding:8px 10px;
+  background:var(--bg-card); border:1px solid var(--border);
+  border-left:3px solid var(--red); border-radius:7px; cursor:pointer;
+  transition:background .15s; margin-bottom:6px;
+}
+.coord-card:hover { background:var(--bg-card-alt); }
+.coord-card.gather      { border-left-color:var(--amber); }
+.coord-card.escalation  { border-left-color:var(--purple); }
+.coord-card.regional    { border-left-color:var(--blue); }
+.coord-card.citi        { border-left-color:var(--citi-blue); }
+.coord-num { width:26px; height:26px; border-radius:50%; background:var(--red); color:white; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.coord-card.gather     .coord-num { background:var(--amber); }
+.coord-card.escalation .coord-num { background:var(--purple); }
+.coord-card.regional   .coord-num { background:var(--blue); }
+.coord-card.citi       .coord-num { background:var(--citi-blue); }
+.coord-info { flex:1; min-width:0; }
+.coord-name { font-size:11.5px; font-weight:600; color:var(--text-hi); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.coord-sub { font-size:10px; color:var(--text-lo); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.coord-xy { font-size:9px; color:var(--text-lo); font-family:'IBM Plex Mono',monospace; }
+
+/* ─── DISTANCE PANEL ─── */
+.dist-section { margin-bottom:10px; }
+.dist-section-title { font-size:9px; font-weight:700; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-lo); padding:8px 0 5px; border-bottom:1px solid var(--border); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.dist-row { display:flex; align-items:center; gap:8px; padding:7px 8px; background:var(--bg-card); border:1px solid var(--border); border-radius:7px; margin-bottom:5px; }
+.dist-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.dist-info { flex:1; min-width:0; }
+.dist-name { font-size:11px; font-weight:600; color:var(--text-hi); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dist-vals { display:flex; gap:8px; margin-top:2px; flex-wrap:wrap; }
+.dist-badge { font-size:9px; font-family:'IBM Plex Mono',monospace; font-weight:700; padding:2px 7px; border-radius:4px; white-space:nowrap; }
+.dist-badge.straight { background:var(--blue-chip); color:#7BAFF0; }
+.dist-badge.drive    { background:var(--amber-chip); color:var(--amber); }
+.dist-badge.drive.loading { background:rgba(255,255,255,0.05); color:var(--text-lo); }
+
+/* ─── MAP TOGGLE ─── */
+.map-toggle-row-wrap { padding:10px 14px; border-top:1px solid var(--border); flex-shrink:0; }
+.toggle-row { display:flex; align-items:center; gap:10px; }
+.toggle-row input { position:absolute; opacity:0; pointer-events:none; }
+.toggle-slider { position:relative; width:36px; height:20px; background:var(--bg-panel); border:1px solid var(--border-mid); border-radius:12px; flex-shrink:0; transition:background .2s; cursor:pointer; }
+.toggle-slider::after { content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; background:var(--text-lo); border-radius:50%; transition:transform .2s,background .2s; }
+.toggle-row input:checked+.toggle-slider { background:var(--red); border-color:var(--red); }
+.toggle-row input:checked+.toggle-slider::after { transform:translateX(16px); background:white; }
+#radius-toggle:checked+.toggle-slider { background:var(--citi-blue); border-color:var(--citi-blue); }
+.toggle-label { font-size:12px; font-weight:600; color:var(--text-hi); flex:1; }
+.toggle-status { font-size:9px; color:var(--text-lo); font-family:'IBM Plex Mono',monospace; }
+.toggle-status.loading { color:var(--amber); }
+.toggle-status.active { color:var(--red); font-weight:700; }
+
+/* ─── LEGEND ─── */
+.legend-strip { display:flex; gap:12px; flex-wrap:wrap; padding:8px 14px; border-top:1px solid var(--border); background:var(--bg-panel); flex-shrink:0; }
+.legend-item { display:flex; align-items:center; gap:5px; font-size:9.5px; color:var(--text-lo); }
+.legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+/* ─── MITIGATION ─── */
+.phase-panel { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.phase-head { padding:12px 16px; display:flex; align-items:center; gap:10px; background:var(--navy-mid); }
+.phase-head.urgent { background:linear-gradient(90deg,var(--red-dark),#4A1210); }
+.phase-num-circle { width:24px; height:24px; border-radius:50%; background:rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:white; flex-shrink:0; }
+.phase-title-text { font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:white; }
+.phase-date-text { font-size:10px; color:rgba(255,255,255,.6); }
+.phase-li { font-size:12px; line-height:1.55; color:var(--text-mid); padding:6px 0 6px 16px; position:relative; border-bottom:1px solid var(--border); }
+.phase-li:last-child { border-bottom:none; }
+.phase-li::before { content:"▸"; position:absolute; left:0; top:6px; color:var(--red); font-weight:700; font-size:10px; }
+
+/* ─── CONCLUSION ─── */
+.concl-item { display:flex; gap:16px; padding:14px 0; border-bottom:1px solid var(--border); align-items:flex-start; }
+.concl-item:last-child { border-bottom:none; }
+.concl-num { font-size:28px; font-weight:700; font-family:'IBM Plex Mono',monospace; color:var(--red); line-height:.9; flex-shrink:0; opacity:.55; }
+.concl-text { font-size:13px; line-height:1.6; color:var(--text-mid); padding-top:2px; }
+.concl-text strong { color:var(--text-hi); font-weight:600; }
+
+/* ─── LEAFLET OVERRIDES ─── */
+.custom-marker { display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:12px; color:white; width:28px; height:28px; border-radius:50%; border:2.5px solid rgba(255,255,255,.9); box-shadow:0 2px 8px rgba(0,0,0,.45); }
+.custom-marker.target     { background:#D9352A; }
+.custom-marker.gather     { background:#C4830A; }
+.custom-marker.escalation { background:#7B35A8; }
+.custom-marker.regional   { background:#2E6CB8; }
+
+/* CITI marker = round blue circle with "CITI" text */
+.citi-marker {
+  display:flex; align-items:center; justify-content:center;
+  font-family:'IBM Plex Sans',sans-serif; font-weight:700; font-size:8px; color:white;
+  width:36px; height:36px; border-radius:50%;
+  background:var(--citi-blue);
+  border:2.5px solid rgba(255,255,255,.9);
+  box-shadow:0 0 0 3px var(--citi-glow), 0 3px 10px rgba(0,0,0,.5);
+  letter-spacing:0.08em;
+  position:relative;
+}
+.citi-marker::before {
+  content:"";
+  position:absolute; inset:-9px;
+  border-radius:50%;
+  border:2px solid var(--citi-blue);
+  opacity:.45;
+  animation:citi-pulse 2.2s ease-out infinite;
+}
+@keyframes citi-pulse { 0%{transform:scale(.85);opacity:.5} 70%{transform:scale(1.45);opacity:0} 100%{transform:scale(1.45);opacity:0} }
+
+.leaflet-popup-content-wrapper { background:#1C2333!important; border:1px solid rgba(255,255,255,.12)!important; border-radius:8px!important; box-shadow:0 6px 24px rgba(0,0,0,.6)!important; }
+.leaflet-popup-content { margin:12px 14px!important; font-family:'IBM Plex Sans',sans-serif; font-size:12px; line-height:1.5; color:#A8B8D0; }
+.leaflet-popup-content b { font-size:13px; color:#F0F4FF; display:block; margin-bottom:4px; }
+.leaflet-popup-tip { background:#1C2333!important; }
+.leaflet-container { background:#0D1117!important; }
+
+@media print {
+  body{background:white;overflow:auto;}
+  .layout{display:block;}
+  .sidebar,.topbar{display:none!important;}
+  .screen{display:block!important;overflow:visible;padding:20px;}
+  #map{height:400px;}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ═══ TOPBAR ═══ -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="topbar-logo">RA</div>
+    <div><div class="topbar-title">Risk Assessment</div><div class="topbar-sub">BEM SI · Hardiknas &amp; May Day 2026</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex:1;padding:0 16px;">
+    <div class="live-dot"></div>
+    <div class="classified-strip">▲ Terbatas — Kalangan Internal ▲</div>
+  </div>
+  <div class="topbar-right">
+    <div class="countdown-widget">
+      <div class="countdown-label" id="countdown-label">Menghitung…</div>
+      <div class="countdown-timer" id="countdown-timer">—</div>
+    </div>
+    <div class="risk-badge">Sedang–Tinggi</div>
+    <button class="topbar-btn" onclick="window.print()" title="Cetak PDF"><svg viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></button>
+  </div>
+</div>
+
+<!-- ═══ SIDEBAR ═══ -->
+<div class="sidebar">
+  <div class="sidebar-section">Navigasi</div>
+  <div class="nav-item active" data-screen="ringkasan">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>
+    Ringkasan
+  </div>
+  <div class="nav-item" data-screen="timeline">
+    <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm.5 5v5.25l4.5 2.67-.75 1.23L11 13V7h1.49z"/></svg>
+    Timeline <span class="nav-badge">5</span>
+  </div>
+  <div class="nav-item" data-screen="risiko">
+    <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+    Risiko <span class="nav-badge">8</span>
+  </div>
+  <div class="nav-item" data-screen="peta">
+    <svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
+    Peta <span class="nav-badge">13</span>
+  </div>
+  <div class="nav-item" data-screen="jarak">
+    <svg viewBox="0 0 24 24"><path d="M21 3L3 10.53v.98l6.84 2.65L12.48 21h.98L21 3z"/></svg>
+    Jarak &amp; Radius <span class="nav-badge">CITI</span>
+  </div>
+  <div class="nav-item" data-screen="mitigasi">
+    <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+    Mitigasi <span class="nav-badge">3</span>
+  </div>
+  <div class="nav-item" data-screen="kesimpulan">
+    <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+    Kesimpulan <span class="nav-badge">5</span>
+  </div>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-meta">
+    <div class="sidebar-meta-row"><span>Disusun</span><span>26 Apr 2026</span></div>
+    <div class="sidebar-meta-row"><span>Klasifikasi</span><span>Terbatas</span></div>
+    <div class="sidebar-meta-row"><span>Reliabilitas</span><span>B-2</span></div>
+    <div class="sidebar-meta-row"><span>Pemantauan</span><span>26 Apr – 4 Mei</span></div>
+    <div class="sidebar-source"><b>Sumber</b>Sdr. Arby Salaka — Mantan Ketua Presma Univ. IAI SEBI (2024–2025)</div>
+  </div>
+</div>
+
+<!-- ═══════════════════ SCREENS ═══════════════════ -->
+
+<!-- ── RINGKASAN ── -->
+<div class="screen active" id="screen-ringkasan">
+  <div class="hero-section">
+    <div class="hero-risk-big">
+      <div class="hero-risk-label">Tingkat Risiko</div>
+      <div class="hero-risk-value">Sedang–Tinggi</div>
+    </div>
+    <div class="hero-divider"></div>
+    <div class="hero-text">
+      Berdasarkan Zoom Meeting Konsolidasi BEM SI <strong>25 April 2026</strong>, aksi diproyeksikan pada rentang <strong>1–4 Mei 2026</strong>.
+      Tagline <span class="tag-pill">#GelapGulitaPendidikanIndonesia</span> &amp; <span class="tag-pill">#ReformasiTotalPendidikan</span> berpotensi resonansi luas.
+      Penggabungan Hardiknas dan May Day berisiko menyatukan kekuatan mahasiswa dan buruh.
+    </div>
+    <div class="hero-divider"></div>
+    <div class="hero-meta-grid">
+      <div class="hero-meta-item"><div class="hero-meta-label">Aktor Utama</div><div class="hero-meta-value">BEM SI</div></div>
+      <div class="hero-meta-item"><div class="hero-meta-label">Titik Puncak</div><div class="hero-meta-value">2 / 4 Mei 2026</div></div>
+      <div class="hero-meta-item"><div class="hero-meta-label">Skala Aksi</div><div class="hero-meta-value">Nasional + Daerah</div></div>
+      <div class="hero-meta-item"><div class="hero-meta-label">Status</div><div class="hero-meta-value" style="color:var(--red)">▲ Aktif Dipantau</div></div>
+    </div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-card" style="--accent-color:var(--red)"><div class="stat-label">Risiko Prioritas</div><div class="stat-value">8</div><div class="stat-sub">4 kritis · 4 tinggi</div></div>
+    <div class="stat-card" style="--accent-color:var(--citi-blue)"><div class="stat-label">Titik CITI</div><div class="stat-value">6</div><div class="stat-sub">PCP · SQ · CCO · MDN · BDG · SBY</div></div>
+    <div class="stat-card" style="--accent-color:var(--amber)"><div class="stat-label">Titik Demo</div><div class="stat-value">6</div><div class="stat-sub">+ 1 monitoring aktif</div></div>
+    <div class="stat-card" style="--accent-color:var(--purple)"><div class="stat-label">Skor Maks</div><div class="stat-value">20</div><div class="stat-sub">SR-02 Sangat Tinggi</div></div>
+  </div>
+  <div class="panel-grid-2">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-icon" style="--icon-bg:var(--amber-chip);--icon-color:var(--amber)"><svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm.5 5v5.25l4.5 2.67-.75 1.23L11 13V7h1.49z"/></svg></div>
+        <div class="panel-title">Garis Waktu Kritis</div>
+      </div>
+      <div class="panel-body">
+        <div class="tl-item"><div class="tl-dot"></div><div><div class="tl-date">26–29 Apr 2026</div><div class="tl-event">Konsolidasi Wilayah/Daerah</div><div class="tl-loc">Seluruh Indonesia</div></div></div>
+        <div class="tl-item critical"><div class="tl-dot"></div><div><div class="tl-date">29 Apr 2026 <span class="tl-flag">Kritis</span></div><div class="tl-event">Simposium BSJB</div><div class="tl-loc">Penentu eskalasi nasional</div></div></div>
+        <div class="tl-item critical"><div class="tl-dot"></div><div><div class="tl-date">1 Mei 2026 <span class="tl-flag">May Day</span></div><div class="tl-event">Aksi Hari Buruh Internasional</div><div class="tl-loc">Jakarta &amp; Daerah</div></div></div>
+        <div class="tl-item critical"><div class="tl-dot"></div><div><div class="tl-date">2 Mei 2026</div><div class="tl-event">Hardiknas — Opsi Aksi Terpusat</div><div class="tl-loc">Pusat &amp; Daerah</div></div></div>
+        <div class="tl-item critical"><div class="tl-dot"></div><div><div class="tl-date">4 Mei 2026 <span class="tl-flag">Puncak</span></div><div class="tl-event">Puncak Aksi Nasional Serentak</div><div class="tl-loc">Pusat &amp; Daerah</div></div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-icon"><svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg></div>
+        <div class="panel-title">Risiko Teratas</div>
+        <div class="panel-badge">Top 4</div>
+      </div>
+      <div class="panel-body">
+        <div class="risk-item critical"><div class="risk-score-box"><div class="score-num">20</div><div class="score-lbl">Skor</div></div><div class="risk-body"><div class="risk-top"><span class="risk-code">SR-02</span><span class="risk-level">Sangat Tinggi</span></div><div class="risk-desc">Penyusupan provokator pihak ketiga ke dalam massa aksi</div><div class="risk-meta-row"><b>Prob:</b> 4 · <b>Dampak:</b> 5</div></div></div>
+        <div class="risk-item critical"><div class="risk-score-box"><div class="score-num">16</div><div class="score-lbl">Skor</div></div><div class="risk-body"><div class="risk-top"><span class="risk-code">SR-01</span><span class="risk-level">Tinggi</span></div><div class="risk-desc">Bentrok aparat keamanan dengan massa aksi</div><div class="risk-meta-row"><b>Prob:</b> 4 · <b>Dampak:</b> 4</div></div></div>
+        <div class="risk-item critical"><div class="risk-score-box"><div class="score-num">16</div><div class="score-lbl">Skor</div></div><div class="risk-body"><div class="risk-top"><span class="risk-code">HS-01</span><span class="risk-level">Tinggi</span></div><div class="risk-desc">Korban luka pada massa aksi (gas air mata, water cannon)</div><div class="risk-meta-row"><b>Prob:</b> 4 · <b>Dampak:</b> 4</div></div></div>
+        <div class="risk-item critical"><div class="risk-score-box"><div class="score-num">16</div><div class="score-lbl">Skor</div></div><div class="risk-body"><div class="risk-top"><span class="risk-code">IR-02</span><span class="risk-level">Tinggi</span></div><div class="risk-desc">Viralitas konten kekerasan di medsos memicu solidaritas spontan</div><div class="risk-meta-row"><b>Prob:</b> 4 · <b>Dampak:</b> 4</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── TIMELINE ── -->
+<div class="screen" id="screen-timeline">
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-icon" style="--icon-bg:var(--amber-chip);--icon-color:var(--amber)"><svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm.5 5v5.25l4.5 2.67-.75 1.23L11 13V7h1.49z"/></svg></div>
+      <div class="panel-title">Timeline Kegiatan BEM SI — Hardiknas &amp; May Day 2026</div>
+      <div class="panel-badge">5 Milestone</div>
+    </div>
+    <div class="panel-body">
+      <div class="tl-item" style="padding:14px 0;"><div class="tl-dot"></div><div><div class="tl-date">26–29 April 2026</div><div class="tl-event">Konsolidasi Wilayah/Daerah</div><div class="tl-loc">Setiap wilayah di seluruh Indonesia</div></div></div>
+      <div class="tl-item critical" style="padding:14px 0;"><div class="tl-dot"></div><div><div class="tl-date">29 April 2026 <span class="tl-flag">Kritis</span></div><div class="tl-event">Simposium BEM SI Jakarta-Bogor (BSJB)</div><div class="tl-loc">Jakarta — titik penentu eskalasi nasional</div></div></div>
+      <div class="tl-item critical" style="padding:14px 0;"><div class="tl-dot"></div><div><div class="tl-date">1 Mei 2026 <span class="tl-flag">May Day</span></div><div class="tl-event">Hari Buruh Internasional — Aksi Gabungan Mahasiswa &amp; Buruh</div><div class="tl-loc">Jakarta &amp; Daerah — potensi konvergensi massa</div></div></div>
+      <div class="tl-item critical" style="padding:14px 0;"><div class="tl-dot"></div><div><div class="tl-date">2 Mei 2026</div><div class="tl-event">Hardiknas — Opsi Aksi Terpusat</div><div class="tl-loc">Pusat &amp; Daerah</div></div></div>
+      <div class="tl-item critical" style="padding:14px 0 0;"><div class="tl-dot"></div><div><div class="tl-date">4 Mei 2026 <span class="tl-flag">Puncak Nasional</span></div><div class="tl-event">Opsi Puncak Aksi Nasional Serentak</div><div class="tl-loc">Pusat &amp; Daerah — skenario eskalasi maksimum</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── RISIKO ── -->
+<div class="screen" id="screen-risiko">
+  <div class="panel-grid-2">
+    <div class="panel">
+      <div class="panel-head"><div class="panel-icon"><svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg></div><div class="panel-title">Risiko Kritis</div><div class="panel-badge">Skor ≥16</div></div>
+      <div class="panel-body">
+        <div class="risk-item critical"><div class="risk-score-box"><div class="score-num">20</div><div class="score-lbl">Skor</div></div><div class="risk-body"><div class="risk-top"><span class="risk-code">SR-02</span><span class="risk-level">Sangat Tinggi</span></div><div class="risk-desc">Penyusupan provokator pihak ketiga ke dalam massa aksi</div><div class="risk-meta-row"><b>Prob:</b> 4 · <b>Dampak:</b> 5</div></div></div>
+        <div class="risk-item critical"><div class="risk-score-box"><div class="score-num">16</div><div class="score-lbl">Skor</div></div><div class="risk-body"><div class="risk-top"><span class="risk-code">SR-01</span><span class="risk-level">Tinggi</span></div><div class="risk-desc">Bentrok aparat keamanan dengan massa aksi</div><div class="risk-meta-row"><b>Prob:</b> 4 · <b>Dampak:</b> 4</div></div></div>
+        <div class="risk-item critical"><div class="risk-score-box"><div class="score-num">16</div><div class="score-lbl">Skor</div></div><div class="risk-body"><div class="risk-top"><span class="risk-code">HS-01</span><span class="risk-level">Tinggi</span></div><div class="risk-desc">Korban luka pada massa aksi (gas air mata, water cannon)</div><div class="risk-meta-row"><b>Prob:</b> 4 · <b>Dampak:</b> 4</div></div></div>
+        <div class="risk-item critical"><div class="risk-score-box"><div class="score-num">16</div><div class="score-lbl">Skor</div></div><div class="risk-body"><div class="risk-top"><span class="risk-code">IR-02</span><span class="risk-level">Tinggi</span></div><div class="risk-desc">Viralitas konten kekerasan di medsos memicu solidaritas spontan</div><div class="risk-meta-row"><b>Prob:</b> 4 · <b>Dampak:</b> 4</div></div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div class="panel-icon" style="--icon-bg:var(--amber-chip);--icon-color:var(--amber)"><svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg></div><div class="panel-title">Risiko Tinggi Lainnya</div><div class="panel-badge">Skor 15</div></div>
+      <div class="panel-body">
+        <div class="risk-item"><div class="risk-score-box"><div class="score-num">15</div><div class="score-lbl">Skor</div></div><div class="risk-body"><div class="risk-top"><span class="risk-code">MR-01</span><span class="risk-level">Tinggi</span></div><div class="risk-desc">Kemacetan parah area pusat pemerintahan (Senayan, Sudirman, Thamrin)</div><div class="risk-meta-row"><b>Prob:</b> 5 · <b>Dampak:</b> 3</div></div></div>
+        <div class="risk-item"><div class="risk-score-box"><div class="score-num">15</div><div class="score-lbl">Skor</div></div><div class="risk-body"><div class="risk-top"><span class="risk-code">MR-04</span><span class="risk-level">Tinggi</span></div><div class="risk-desc">Hambatan layanan darurat (ambulans, pemadam kebakaran)</div><div class="risk-meta-row"><b>Prob:</b> 3 · <b>Dampak:</b> 5</div></div></div>
+        <div class="risk-item"><div class="risk-score-box"><div class="score-num">15</div><div class="score-lbl">Skor</div></div><div class="risk-body"><div class="risk-top"><span class="risk-code">PR-05</span><span class="risk-level">Tinggi</span></div><div class="risk-desc">Snowball effect — gelombang aksi lanjutan di berbagai daerah</div><div class="risk-meta-row"><b>Prob:</b> 3 · <b>Dampak:</b> 5</div></div></div>
+        <div class="risk-item"><div class="risk-score-box"><div class="score-num">15</div><div class="score-lbl">Skor</div></div><div class="risk-body"><div class="risk-top"><span class="risk-code">IR-01</span><span class="risk-level">Tinggi</span></div><div class="risk-desc">Penyebaran hoaks dan disinformasi terkait jumlah massa atau insiden</div><div class="risk-meta-row"><b>Prob:</b> 5 · <b>Dampak:</b> 3</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PETA ── -->
+<div class="screen" id="screen-peta">
+  <div class="peta-layout">
+    <div class="peta-sidebar">
+      <div class="peta-sidebar-hdr">
+        <svg style="width:13px;height:13px;fill:var(--text-lo);flex-shrink:0;" viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
+        Semua Titik
+        <span class="panel-badge" style="margin-left:auto;">13 Titik</span>
+      </div>
+      <div class="peta-tab-row">
+        <div class="peta-tab active" id="ptab-citi" onclick="switchPetaTab('citi')">CITI (6)</div>
+        <div class="peta-tab" id="ptab-demo" onclick="switchPetaTab('demo')">Demo (6)</div>
+        <div class="peta-tab" id="ptab-all" onclick="switchPetaTab('all')">Semua</div>
+      </div>
+      <div class="peta-scroll" id="peta-coord-list"></div>
+      <div class="map-toggle-row-wrap">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--text-lo);text-transform:uppercase;margin-bottom:8px;">Lapisan Peta</div>
+        <label class="toggle-row" style="margin-bottom:8px;">
+          <input type="checkbox" id="longmarch-toggle">
+          <span class="toggle-slider"></span>
+          <div class="toggle-label">Rute Longmarch Demo</div>
+          <div class="toggle-status" id="longmarch-status">Mati</div>
+        </label>
+        <label class="toggle-row">
+          <input type="checkbox" id="radius-toggle">
+          <span class="toggle-slider" style=""></span>
+          <div class="toggle-label">Radius 5km CITI</div>
+          <div class="toggle-status" id="radius-status">Mati</div>
+        </label>
+      </div>
+      <div class="legend-strip">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--citi-blue)"></div>CITI</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#D9352A"></div>Target</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#C4830A"></div>Kumpul</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#7B35A8"></div>Eskalasi</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#2E6CB8"></div>Daerah</div>
+      </div>
+    </div>
+    <div class="map-panel">
+      <div id="map"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── JARAK & RADIUS ── -->
+<div class="screen" id="screen-jarak">
+  <div class="panel" style="flex-shrink:0;margin-bottom:0;">
+    <div class="panel-head">
+      <div class="panel-icon" style="--icon-bg:var(--blue-chip);--icon-color:var(--citi-blue)"><svg viewBox="0 0 24 24"><path d="M21 3L3 10.53v.98l6.84 2.65L12.48 21h.98L21 3z"/></svg></div>
+      <div class="panel-title">Radius 5km — Titik Demo dalam Jangkauan CITI</div>
+      <div class="panel-badge" id="jarak-summary-badge">—</div>
+    </div>
+    <div style="padding:10px 16px 8px;font-size:11px;color:var(--text-lo);line-height:1.6;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <span style="display:inline-flex;align-items:center;gap:5px;"><span class="dist-badge straight" style="font-size:9px;">📐 Garis Lurus</span> Haversine (km)</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;"><span class="dist-badge drive" style="font-size:9px;">🚗 Kendaraan</span> OSRM routing API</span>
+      <span style="margin-left:auto;color:var(--citi-blue);font-size:10px;font-weight:700;">Filter: ≤ 5 km garis lurus · hanya CITI Jakarta area</span>
+    </div>
+    <div class="panel-body" id="jarak-container" style="padding:12px 16px;"></div>
+  </div>
+</div>
+
+<!-- ── MITIGASI ── -->
+<div class="screen" id="screen-mitigasi">
+  <div class="panel-grid-3">
+    <div class="phase-panel">
+      <div class="phase-head urgent"><div class="phase-num-circle">I</div><div><div class="phase-title-text">Pra-Aksi</div><div class="phase-date-text">26–30 April 2026</div></div></div>
+      <div style="padding:8px 16px 12px;">
+        <div class="phase-li">Pemantauan intensif konsolidasi BSJB (29 Apr) sebagai titik kritis penentu eskalasi</div>
+        <div class="phase-li">Inisiasi dialog awal dengan pimpinan BEM SI via jalur Komisi X DPR RI</div>
+        <div class="phase-li">Kounter-narasi positif atas isu "Gelap Gulita Pendidikan"</div>
+        <div class="phase-li">Penyusunan Renpamtu berbasis skenario terburuk</div>
+        <div class="phase-li">Pemetaan estimasi massa per titik kumpul</div>
+      </div>
+    </div>
+    <div class="phase-panel">
+      <div class="phase-head"><div class="phase-num-circle">II</div><div><div class="phase-title-text">Saat Aksi</div><div class="phase-date-text">1, 2, 4 Mei 2026</div></div></div>
+      <div style="padding:8px 16px 12px;">
+        <div class="phase-li">Pola pengamanan persuasif → preventif → represif sesuai eskalasi</div>
+        <div class="phase-li">Tim khusus identifikasi dan netralisasi provokator pihak ketiga</div>
+        <div class="phase-li">Pengalihan lalu lintas T-12 jam, sosialisasi via media massa &amp; medsos</div>
+        <div class="phase-li">Pos kesehatan dan standby ambulans di setiap titik aksi</div>
+        <div class="phase-li">War room media sosial untuk klarifikasi cepat hoaks</div>
+      </div>
+    </div>
+    <div class="phase-panel">
+      <div class="phase-head"><div class="phase-num-circle">III</div><div><div class="phase-title-text">Pasca-Aksi</div><div class="phase-date-text">5–7 Mei 2026</div></div></div>
+      <div style="padding:8px 16px 12px;">
+        <div class="phase-li">Evaluasi insiden menyeluruh dan investigasi hukum</div>
+        <div class="phase-li">Penanganan korban (massa &amp; aparat) secara objektif</div>
+        <div class="phase-li">Dialog lanjutan dengan BEM SI atas tuntutan substantif</div>
+        <div class="phase-li">Monitoring potensi aksi lanjutan (snowball effect)</div>
+        <div class="phase-li">Rilis pers transparan untuk pemulihan kredibilitas</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── KESIMPULAN ── -->
+<div class="screen" id="screen-kesimpulan">
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-icon" style="--icon-bg:var(--green-chip);--icon-color:var(--green)"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></div>
+      <div class="panel-title">Kesimpulan Strategis</div>
+      <div class="panel-badge">5 Poin</div>
+    </div>
+    <div class="panel-body">
+      <div class="concl-item"><div class="concl-num">01</div><div class="concl-text">Penggabungan momentum <strong>Hardiknas dan May Day</strong> berisiko menyatukan kekuatan mahasiswa dan buruh, memperbesar skala dan dampak aksi secara signifikan.</div></div>
+      <div class="concl-item"><div class="concl-num">02</div><div class="concl-text">Konsolidasi <strong>BSJB tanggal 29 April</strong> merupakan titik kritis penentu eskalasi — wajib dipantau intensif dan menjadi dasar penyesuaian rencana respons.</div></div>
+      <div class="concl-item"><div class="concl-num">03</div><div class="concl-text">Prioritaskan jalur <strong>dialog formal melalui Komisi X DPR RI</strong> sebelum 1 Mei untuk meredam eskalasi dan membuka kanal komunikasi resmi dengan BEM SI.</div></div>
+      <div class="concl-item"><div class="concl-num">04</div><div class="concl-text">Aktivasi <strong>Posko Pengendalian Krisis</strong> dari 30 April hingga 7 Mei dengan koordinasi lintas instansi TNI–Polri–Pemda secara terpadu dan terjadwal.</div></div>
+      <div class="concl-item"><div class="concl-num">05</div><div class="concl-text">Jaga <strong>proporsionalitas penggunaan kekuatan</strong> untuk mencegah snowball effect pasca-aksi yang dapat memicu gelombang demonstrasi lanjutan di berbagai daerah.</div></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /.layout -->
+
+<script>
+// ─── NAVIGATION ───────────────────────────────────────────
+const navItems = document.querySelectorAll('.nav-item[data-screen]');
+const screens  = document.querySelectorAll('.screen');
+navItems.forEach(item => {
+  item.addEventListener('click', () => {
+    const t = item.dataset.screen;
+    navItems.forEach(n=>n.classList.remove('active'));
+    screens.forEach(s=>s.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('screen-'+t).classList.add('active');
+    if (t==='peta' && typeof map!=='undefined') setTimeout(()=>map.invalidateSize(),60);
+    if (t==='jarak') buildJarak();
+  });
+});
+
+// ─── COUNTDOWN ────────────────────────────────────────────
+const milestones=[
+  {label:"Konsolidasi Wilayah",date:new Date("2026-04-26T07:00:00+07:00"),end:new Date("2026-04-29T23:59:00+07:00")},
+  {label:"Simposium BSJB",     date:new Date("2026-04-29T08:00:00+07:00"),end:new Date("2026-04-29T23:59:00+07:00")},
+  {label:"May Day",            date:new Date("2026-05-01T08:00:00+07:00"),end:new Date("2026-05-01T23:59:00+07:00")},
+  {label:"Hardiknas",          date:new Date("2026-05-02T08:00:00+07:00"),end:new Date("2026-05-02T23:59:00+07:00")},
+  {label:"Puncak Nasional",    date:new Date("2026-05-04T08:00:00+07:00"),end:new Date("2026-05-04T23:59:00+07:00")}
+];
+const pad=n=>String(n).padStart(2,'0');
+function fmtD(ms){if(ms<=0)return'00:00:00';const s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60),ss=s%60;return d>0?`${d}h ${pad(h)}j ${pad(m)}m`:`${pad(h)}:${pad(m)}:${pad(ss)}`;}
+const timerEl=document.getElementById('countdown-timer'),labelEl=document.getElementById('countdown-label');
+function updateCD(){
+  const now=new Date();
+  const active=milestones.find(m=>now>=m.date&&now<=m.end);
+  if(active){labelEl.textContent='🔴 BERLANGSUNG';timerEl.textContent=fmtD(active.end-now);return;}
+  const next=milestones.find(m=>m.date>now);
+  if(next){labelEl.textContent=next.label;timerEl.textContent=fmtD(next.date-now);}
+  else{labelEl.textContent='Periode Selesai';timerEl.textContent='—';}
+}
+updateCD(); setInterval(updateCD,1000);
+
+// ─── DATA ─────────────────────────────────────────────────
+const citiPoints = [
+  {code:'PCP', name:'Pacific Century Place',            addr:'SCBD, Jakarta Selatan',   lat:-6.227789222187937,  lon:106.80853418410136},
+  {code:'SQ',  name:'South Quarter',                    addr:'TB Simatupang, Jak-Sel',  lat:-6.294326923051124,  lon:106.78472088634945},
+  {code:'CCO', name:'CCO Housing (Taman Patra Residence)', addr:'Cibubur, Jakarta Timur',lat:-6.236405074875546,  lon:106.83318406383363},
+  {code:'MDN', name:'ICG Medan (URO Building)',          addr:'Medan, Sumatera Utara',   lat: 3.5810134640436835, lon: 98.67689391331096},
+  {code:'BDG', name:'ICG Bandung (Wisma Bumiputera)',    addr:'Bandung, Jawa Barat',     lat:-6.9222633372688165, lon:107.61645209238358},
+  {code:'SBY', name:'ICG Surabaya (Japfa Indoland II)',  addr:'Surabaya, Jawa Timur',    lat:-7.271940627725092,  lon:112.74261214425506},
+];
+
+const demoLocations = [
+  {num:1, name:'Gedung DPR/MPR RI',       subtitle:'Komisi X — Bidang Pendidikan',                lat:-6.2089515,  lon:106.7998183, type:'target',    note:'Lokasi aksi pusat utama. Komisi X DPR RI menjadi mediator potensial.'},
+  {num:2, name:'Kemendikti',              subtitle:'Kementerian Pendidikan Tinggi, Sains & Teknologi', lat:-6.2240767,  lon:106.8036064, type:'target',    note:'Pusat tuntutan reformasi sektor pendidikan tinggi.'},
+  {num:3, name:'Kemendikdasmen',          subtitle:'Sekretariat Jenderal Kemendikbudristek',       lat:-6.2250625,  lon:106.8025469, type:'target',    note:'Pusat tuntutan reformasi pendidikan dasar dan menengah.'},
+  {num:4, name:'Patung Kuda Arjuna Wijaya',subtitle:'Persimpangan Thamrin–Medan Merdeka Barat',   lat:-6.1800296,  lon:106.8227781, type:'gather',    note:'Lokasi favorit aksi May Day dan demonstrasi mahasiswa.'},
+  {num:5, name:'Istana Merdeka',          subtitle:'Kantor Kepresidenan',                          lat:-6.170386,   lon:106.824205,  type:'escalation',note:'Bila tuntutan meluas dari sektoral ke politik nasional.'},
+  {num:6, name:'Balai Kota DKI Jakarta',  subtitle:'Kantor Gubernur DKI',                          lat:-6.1813798,  lon:106.8285822, type:'regional',  note:'Aksi tingkat wilayah/daerah dengan tuntutan kepada Gubernur DKI.'},
+];
+
+// ─── DISTANCE UTILS ───────────────────────────────────────
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// ─── MAP INIT ─────────────────────────────────────────────
+const map = L.map('map',{zoomControl:true,attributionControl:true}).setView([-6.22,106.82],12);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy; OpenStreetMap &copy; CARTO',subdomains:'abcd',maxZoom:19
+}).addTo(map);
+
+const demoMarkers={}, citiMarkers=[];
+
+// CITI markers (blue circle + CITI text)
+citiPoints.forEach(pt=>{
+  const icon=L.divIcon({
+    className:'',
+    html:`<div class="citi-marker">CITI</div>`,
+    iconSize:[36,36],iconAnchor:[18,18]
+  });
+  const popup=`<b>${pt.code} — ${pt.name}</b>
+    <div style="color:#6A8CB0;font-size:11px;margin-bottom:5px;font-style:italic;">${pt.addr}</div>
+    <div style="font-size:10px;background:rgba(26,79,160,0.25);color:#8AADFF;padding:3px 7px;border-radius:4px;font-family:'IBM Plex Mono',monospace;">${pt.lat.toFixed(6)}, ${pt.lon.toFixed(6)}</div>`;
+  const m=L.marker([pt.lat,pt.lon],{icon}).addTo(map).bindPopup(popup,{maxWidth:280});
+  citiMarkers.push({pt,m});
+});
+
+// Demo markers
+demoLocations.forEach(loc=>{
+  const icon=L.divIcon({
+    className:'',
+    html:`<div class="custom-marker ${loc.type}">${loc.num}</div>`,
+    iconSize:[28,28],iconAnchor:[14,14]
+  });
+  const popup=`<b>${loc.num}. ${loc.name}</b>
+    <div style="color:#6A8CB0;font-size:11px;margin-bottom:5px;font-style:italic;">${loc.subtitle}</div>
+    <div style="font-size:10px;background:rgba(255,255,255,0.07);padding:3px 7px;border-radius:4px;margin-bottom:5px;font-family:'IBM Plex Mono',monospace;color:#A8B8D0;">${loc.lat.toFixed(6)}, ${loc.lon.toFixed(6)}</div>
+    <div style="font-size:11px;color:#7A9CC0;">${loc.note}</div>`;
+  demoMarkers[loc.num]=L.marker([loc.lat,loc.lon],{icon}).addTo(map).bindPopup(popup,{maxWidth:280});
+});
+
+map.fitBounds(L.latLngBounds(demoLocations.map(l=>[l.lat,l.lon])),{padding:[40,40]});
+
+// ─── PETA TABS ────────────────────────────────────────────
+let currentPetaTab='citi';
+function switchPetaTab(tab){
+  currentPetaTab=tab;
+  ['citi','demo','all'].forEach(t=>document.getElementById('ptab-'+t).classList.remove('active'));
+  document.getElementById('ptab-'+tab).classList.add('active');
+  renderCoordList();
+  // show/hide markers
+  citiMarkers.forEach(({m})=>{
+    if(tab==='demo') map.removeLayer(m); else { if(!map.hasLayer(m)) m.addTo(map); }
+  });
+  Object.values(demoMarkers).forEach(m=>{
+    if(tab==='citi') map.removeLayer(m); else { if(!map.hasLayer(m)) m.addTo(map); }
+  });
+  // fit bounds
+  if(tab==='citi') map.fitBounds(L.latLngBounds(citiPoints.map(p=>[p.lat,p.lon])),{padding:[40,40]});
+  else if(tab==='demo') map.fitBounds(L.latLngBounds(demoLocations.map(l=>[l.lat,l.lon])),{padding:[40,40]});
+  else map.fitBounds(L.latLngBounds([...citiPoints.map(p=>[p.lat,p.lon]),...demoLocations.map(l=>[l.lat,l.lon])]),{padding:[30,30]});
+}
+
+function renderCoordList(){
+  const el=document.getElementById('peta-coord-list');
+  el.innerHTML='';
+  if(currentPetaTab==='citi'||currentPetaTab==='all'){
+    if(currentPetaTab==='all'){
+      const hdr=document.createElement('div');
+      hdr.style.cssText='font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--text-lo);padding:4px 0 6px;border-bottom:1px solid var(--border);margin-bottom:6px;';
+      hdr.textContent='Titik Monitoring CITI';
+      el.appendChild(hdr);
+    }
+    citiPoints.forEach((pt,i)=>{
+      const c=document.createElement('div');
+      c.className='coord-card citi';
+      c.innerHTML=`<div class="coord-num" style="width:28px;height:28px;font-size:10px;background:var(--citi-blue);">${pt.code}</div><div class="coord-info"><div class="coord-name">${pt.name}</div><div class="coord-sub">${pt.addr}</div><div class="coord-xy">${pt.lat.toFixed(5)}, ${pt.lon.toFixed(5)}</div></div>`;
+      c.onclick=()=>{ map.flyTo([pt.lat,pt.lon],16,{duration:.8}); setTimeout(()=>citiMarkers[i].m.openPopup(),800); };
+      el.appendChild(c);
+    });
+  }
+  if(currentPetaTab==='demo'||currentPetaTab==='all'){
+    if(currentPetaTab==='all'){
+      const hdr=document.createElement('div');
+      hdr.style.cssText='font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--text-lo);padding:10px 0 6px;border-bottom:1px solid var(--border);margin-bottom:6px;';
+      hdr.textContent='Titik Demo';
+      el.appendChild(hdr);
+    }
+    demoLocations.forEach(loc=>{
+      const c=document.createElement('div');
+      c.className=`coord-card ${loc.type}`;
+      c.innerHTML=`<div class="coord-num">${loc.num}</div><div class="coord-info"><div class="coord-name">${loc.name}</div><div class="coord-sub">${loc.subtitle}</div><div class="coord-xy">${loc.lat.toFixed(5)}, ${loc.lon.toFixed(5)}</div></div>`;
+      c.onclick=()=>{ map.flyTo([loc.lat,loc.lon],17,{duration:.7}); setTimeout(()=>demoMarkers[loc.num].openPopup(),700); };
+      el.appendChild(c);
+    });
+  }
+}
+renderCoordList();
+
+// ─── LONGMARCH ROUTE ──────────────────────────────────────
+let routeLayers=[],cachedRoute=null;
+function showRoute(geo){
+  const casing=L.geoJSON(geo,{style:{color:'rgba(255,255,255,.55)',weight:8,lineCap:'round',lineJoin:'round'},interactive:false}).addTo(map);
+  const main=L.geoJSON(geo,{style:{color:'#D9352A',weight:3.5,opacity:.95,lineCap:'round',lineJoin:'round'},interactive:false}).addTo(map);
+  routeLayers=[casing,main];
+}
+function hideRoute(){routeLayers.forEach(l=>map.removeLayer(l));routeLayers=[];}
+const ltog=document.getElementById('longmarch-toggle'),lsts=document.getElementById('longmarch-status');
+ltog.addEventListener('change',async e=>{
+  if(e.target.checked){
+    if(cachedRoute){showRoute(cachedRoute.geometry);lsts.textContent=`${(cachedRoute.distance/1000).toFixed(2)} km`;lsts.className='toggle-status active';return;}
+    lsts.textContent='Memuat…';lsts.className='toggle-status loading';
+    try{
+      const coords=demoLocations.map(l=>`${l.lon},${l.lat}`).join(';');
+      const res=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+      const data=await res.json();
+      if(data.code!=='Ok')throw new Error();
+      cachedRoute=data.routes[0];
+      showRoute(cachedRoute.geometry);
+      lsts.textContent=`${(cachedRoute.distance/1000).toFixed(2)} km · ±${Math.round(cachedRoute.duration/60)}mnt`;
+      lsts.className='toggle-status active';
+    }catch{lsts.textContent='Gagal — coba lagi';lsts.className='toggle-status error';ltog.checked=false;}
+  }else{hideRoute();lsts.textContent='Mati';lsts.className='toggle-status';}
+});
+
+// ─── RADIUS CIRCLES (5km per CITI) ────────────────────────
+// Colors per CITI index
+const citiRadiusColors = [
+  {fill:'rgba(26,79,160,0.08)', stroke:'rgba(26,79,160,0.55)'},   // PCP - blue
+  {fill:'rgba(26,79,160,0.08)', stroke:'rgba(80,140,220,0.55)'},   // SQ  - lighter blue
+  {fill:'rgba(26,79,160,0.08)', stroke:'rgba(100,160,240,0.50)'},  // CCO - even lighter
+  {fill:'rgba(26,79,160,0.05)', stroke:'rgba(26,79,160,0.3)'},     // MDN
+  {fill:'rgba(26,79,160,0.05)', stroke:'rgba(26,79,160,0.3)'},     // BDG
+  {fill:'rgba(26,79,160,0.05)', stroke:'rgba(26,79,160,0.3)'},     // SBY
+];
+let radiusLayers=[];
+const rtog=document.getElementById('radius-toggle'),rsts=document.getElementById('radius-status');
+
+function showRadiusCircles(){
+  citiPoints.forEach((pt,i)=>{
+    const col=citiRadiusColors[i];
+    const circle=L.circle([pt.lat,pt.lon],{
+      radius:5000,
+      color:col.stroke,
+      weight:1.5,
+      fillColor:col.fill,
+      fillOpacity:1,
+      dashArray:'5,4',
+      interactive:false
+    }).addTo(map);
+    // Add label at top of circle
+    const labelIcon=L.divIcon({
+      className:'',
+      html:`<div style="font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;color:rgba(140,185,255,0.85);background:rgba(13,17,23,0.75);padding:2px 6px;border-radius:4px;white-space:nowrap;border:1px solid rgba(26,79,160,0.4);">${pt.code} 5km</div>`,
+      iconAnchor:[24,8]
+    });
+    // Place label at approx top of circle (offset ~0.045 deg lat = ~5km)
+    const labelMarker=L.marker([pt.lat+0.045,pt.lon],{icon:labelIcon,interactive:false});
+    labelMarker.addTo(map);
+    radiusLayers.push(circle,labelMarker);
+  });
+  rsts.textContent=`Aktif · ${citiPoints.length} lingkaran`;
+  rsts.className='toggle-status active';
+  rsts.style.color='#7BAFF0';
+}
+function hideRadiusCircles(){
+  radiusLayers.forEach(l=>map.removeLayer(l));
+  radiusLayers=[];
+  rsts.textContent='Mati';
+  rsts.className='toggle-status';
+  rsts.style.color='';
+}
+rtog.addEventListener('change',e=>{
+  if(e.target.checked) showRadiusCircles();
+  else hideRadiusCircles();
+});
+
+// ─── JARAK PAGE ───────────────────────────────────────────
+// Only show demo locations within 5km straight-line of a CITI Jakarta point
+const RADIUS_KM = 5;
+const jakartaCiti = citiPoints.filter(c=>['PCP','SQ','CCO'].includes(c.code));
+
+let jarakBuilt=false;
+const driveCache={};
+
+async function fetchDriveKm(fromLat,fromLon,toLat,toLon,key){
+  if(driveCache[key]) return driveCache[key];
+  try{
+    const url=`https://router.project-osrm.org/route/v1/driving/${fromLon},${fromLat};${toLon},${toLat}?overview=false`;
+    const res=await fetch(url);
+    if(!res.ok) throw new Error();
+    const data=await res.json();
+    if(data.code!=='Ok') throw new Error();
+    const km=(data.routes[0].distance/1000).toFixed(1);
+    const min=Math.round(data.routes[0].duration/60);
+    driveCache[key]={km,min};
+    return {km,min};
+  }catch{return null;}
+}
+
+function buildJarak(){
+  if(jarakBuilt) return;
+  jarakBuilt=true;
+  const container=document.getElementById('jarak-container');
+  container.innerHTML='';
+
+  const typeColor={'target':'#D9352A','gather':'#C4830A','escalation':'#7B35A8','regional':'#2E6CB8'};
+
+  let totalHits=0;
+
+  // For each Jakarta CITI, find demo locations within 5km
+  jakartaCiti.forEach(citi=>{
+    const nearby=demoLocations.map(demo=>({
+      demo,
+      sl: haversine(citi.lat,citi.lon,demo.lat,demo.lon)
+    })).filter(x=>x.sl<=RADIUS_KM).sort((a,b)=>a.sl-b.sl);
+
+    if(nearby.length===0) return; // skip if none in range
+
+    totalHits+=nearby.length;
+
+    const section=document.createElement('div');
+    section.className='dist-section';
+
+    const title=document.createElement('div');
+    title.className='dist-section-title';
+    title.innerHTML=`
+      <div style="width:12px;height:12px;border-radius:50%;background:var(--citi-blue);flex-shrink:0;"></div>
+      <span style="color:var(--text-hi);font-weight:700;">${citi.code}</span>
+      <span style="color:var(--text-lo);font-weight:400;font-size:10px;">— ${citi.name}</span>
+      <span style="margin-left:auto;background:var(--citi-blue);color:white;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;">${nearby.length} titik dalam 5km</span>`;
+    section.appendChild(title);
+
+    nearby.forEach(({demo,sl})=>{
+      const key=`${citi.code}-${demo.num}`;
+      const col=typeColor[demo.type]||'#607090';
+      // proximity badge color
+      const slNum=parseFloat(sl);
+      const proximityColor = slNum<=2 ? '#2A8C54' : slNum<=3.5 ? '#D4920A' : '#D9352A';
+
+      const row=document.createElement('div');
+      row.className='dist-row';
+      row.style.cursor='pointer';
+      row.innerHTML=`
+        <div class="dist-dot" style="background:${col};width:10px;height:10px;flex-shrink:0;"></div>
+        <div class="dist-info">
+          <div class="dist-name">${demo.num}. ${demo.name}
+            <span style="font-size:9px;font-weight:600;color:${proximityColor};margin-left:6px;">⬤ ${sl.toFixed(2)} km</span>
+          </div>
+          <div style="font-size:10px;color:var(--text-lo);margin-bottom:4px;">${demo.subtitle}</div>
+          <div class="dist-vals">
+            <span class="dist-badge straight">📐 ${sl.toFixed(2)} km garis lurus</span>
+            <span class="dist-badge drive loading" id="drv-${key}">🚗 Memuat…</span>
+          </div>
+        </div>`;
+
+      // Click to fly map to this demo point
+      row.addEventListener('click',()=>{
+        // Switch to peta tab
+        navItems.forEach(n=>n.classList.remove('active'));
+        screens.forEach(s=>s.classList.remove('active'));
+        document.querySelector('[data-screen="peta"]').classList.add('active');
+        document.getElementById('screen-peta').classList.add('active');
+        setTimeout(()=>{
+          map.invalidateSize();
+          map.flyTo([demo.lat,demo.lon],16,{duration:.8});
+          setTimeout(()=>demoMarkers[demo.num].openPopup(),900);
+        },60);
+      });
+      row.title='Klik untuk lihat di peta';
+
+      section.appendChild(row);
+
+      // Fetch drive distance
+      fetchDriveKm(citi.lat,citi.lon,demo.lat,demo.lon,key).then(res=>{
+        const driveEl=document.getElementById(`drv-${key}`);
+        if(!driveEl)return;
+        if(res){ driveEl.textContent=`🚗 ${res.km} km (±${res.min} mnt)`; }
+        else { driveEl.textContent='🚗 Tidak tersedia'; }
+        driveEl.classList.remove('loading');
+      });
+    });
+
+    container.appendChild(section);
+  });
+
+  // If no hits at all
+  if(totalHits===0){
+    container.innerHTML=`<div style="text-align:center;padding:40px 20px;color:var(--text-lo);">
+      <div style="font-size:32px;margin-bottom:12px;">🔍</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text-mid);">Tidak ada titik demo dalam radius 5km</div>
+      <div style="font-size:11px;margin-top:6px;">Semua lokasi demo berada di luar jangkauan 5km dari CITI Jakarta area</div>
+    </div>`;
+  }
+
+  // Update badge
+  const badge=document.getElementById('jarak-summary-badge');
+  if(badge) badge.textContent=`${totalHits} titik terdeteksi`;
+}
+</script>
+</body>
+</html>
